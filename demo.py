@@ -3,16 +3,13 @@
 #
 # Author:   Kazuto Nakashima
 # URL:      http://kazuto1011.github.io
-# Created:  2017-11-01
+# Created:  2017-11-15
 
-import argparse
-import os.path as osp
 
 import click
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import yaml
 
 import torch
 import torch.nn as nn
@@ -25,7 +22,7 @@ from torch.autograd import Variable
 @click.command()
 @click.option('--dataset', required=True, type=click.Choice(['ade20k', 'voc12', 'cityscapes']))
 @click.option('--image_path', required=True)
-@click.option('--cuda/--no-cuda', default=False)
+@click.option('--cuda/--no-cuda', default=True)
 @click.option('--crf', is_flag=True)
 def main(dataset, image_path, cuda, crf):
     CONFIG = {

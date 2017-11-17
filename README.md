@@ -1,6 +1,6 @@
 # PSPNet with PyTorch
 
-PyTorch implementation of Pyramid Scene Parsing Network (https://arxiv.org/abs/1612.01105). This repo is just for *caffemodel conversion* and *inference*.
+PyTorch implementation of Pyramid Scene Parsing Network (https://arxiv.org/abs/1612.01105). This repo is just for *Caffe to PyTorch* model conversion and inference.
 
 ### Requirements
 
@@ -9,12 +9,12 @@ PyTorch implementation of Pyramid Scene Parsing Network (https://arxiv.org/abs/1
 * pydensecrf
 * protobuf
 
-## Convert caffemodels
-Instead of building the author's caffe, you can converts off-the-shelf caffemodels through the author's ```caffe.proto``` to load in PyTorch.
+## Model Conversion
+Instead of building the author's caffe implementation, you can convert off-the-shelf caffemodels to PyTorch models via only the ```caffe.proto```.
 
 ### 1. Compile the ```.proto``` file for Python API
 *NOTE: This step can be skipped. FYI.*<br>
-Download the author's ```caffe.proto```, not the one in the original caffe.
+Download [the author's ```caffe.proto```](https://github.com/hszhao/PSPNet/blob/master/src/caffe/proto/caffe.proto), not the one in the original caffe.
 ```sh
 # For protoc command
 pip install protobuf
@@ -39,7 +39,8 @@ python convert.py --dataset [ade20k|voc12|cityscape]
 ```sh
 python demo.py --dataset [ade20k|voc12|cityscape] --image <path to image>
 ```
-```--crf``` option performs CRF postprocessing.
+* With a ```--no-cuda``` option, this runs on CPU.
+* With a ```--crf``` option, you can perform a CRF postprocessing.
 
 ![](docs/demo.png)
 

@@ -33,7 +33,6 @@ def dense_crf(img, probs):
     d.addPairwiseBilateral(sxy=Bi_XY_STD, srgb=Bi_RGB_STD, rgbim=img, compat=Bi_W)
 
     Q = d.inference(MAX_ITER)
-    # Q = np.argmax(np.array(Q), axis=0).reshape((h, w))
     Q = np.array(Q).reshape((c, h, w))
 
     return Q
