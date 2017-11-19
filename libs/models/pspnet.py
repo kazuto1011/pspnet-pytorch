@@ -10,72 +10,18 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
-class _ConvBNReLU(nn.Sequential):
-
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, relu=True):
-        super(_ConvBNReLU, self).__init__()
-        self.add_module('conv', nn.Conv2d(in_channels, out_channels, kernel_size,
-                                          stride=stride, padding=padding, dilation=dilation, bias=False))
-        self.add_module('bn', nn.BatchNorm2d(out_channels,
-                                             eps=1e-5, momentum=0.95, affine=True))
-        if relu:
-            self.add_module('relu', nn.ReLU())
-
-    def forward(self, x):
-        return super(_ConvBNReLU, self).forward(x)
-
-
-class _BottleConv(nn.Sequential):
-    def __init__(self, in_channels, mid_channels, out_channels, stride, dilation):
-        super(_BottleConv, self).__init__()
-        self.reduce = _ConvBNReLU(in_channels, mid_channels, 1, stride, 0, 1)  # NOQA
-        self.conv3x3 = _ConvBNReLU(mid_channels, mid_channels, 3, 1, dilation, dilation)  # NOQA
-        self.increase = _ConvBNReLU(mid_channels, out_channels, 1, 1, 0, 1, relu=False)  # NOQA
-        self.proj = _ConvBNReLU(in_channels, out_channels, 1, stride, 0, 1, relu=False)  # NOQA
-
-    def forward(self, x):
-        h = self.reduce(x)
-        h = self.conv3x3(h)
-        h = self.increase(h)
-        return F.relu(h + self.proj(x))
-
-
-class _BottleIdentity(nn.Sequential):
-
-    def __init__(self, in_channels, mid_channels, dilation):
-        super(_BottleIdentity, self).__init__()
-        self.reduce = _ConvBNReLU(in_channels, mid_channels, 1, 1, 0, 1)
-        self.conv3x3 = _ConvBNReLU(mid_channels, mid_channels, 3, 1, dilation, dilation)  # NOQA
-        self.increase = _ConvBNReLU(mid_channels, in_channels, 1, 1, 0, 1, relu=False)  # NOQA
-
-    def forward(self, x):
-        h = self.reduce(x)
-        h = self.conv3x3(h)
-        h = self.increase(h)
-        return F.relu(h + x)
-
-
-class _ResBlock(nn.Sequential):
-
-    def __init__(self, n_layer, in_channels, mid_channels, out_channels, stride, dilate):
-        super(_ResBlock, self).__init__()
-        self.add_module('block1', _BottleConv(in_channels, mid_channels, out_channels, stride, dilate))  # NOQA
-        for i in range(2, n_layer + 1):
-            self.add_module('block' + str(i), _BottleIdentity(out_channels, mid_channels, dilate))  # NOQA
-
-    def __call__(self, x):
-        return super(_ResBlock, self).forward(x)
+from resnet import _ConvBatchNormReLU, _ResBlock
 
 
 class _DilatedFCN(nn.Module):
+    """ResNet-based Dilated FCN"""
+
     def __init__(self, n_blocks):
         super(_DilatedFCN, self).__init__()
         self.layer1 = nn.Sequential(OrderedDict([
-            ('conv1', _ConvBNReLU(3, 64, 3, 2, 1, 1)),
-            ('conv2', _ConvBNReLU(64, 64, 3, 1, 1, 1)),
-            ('conv3', _ConvBNReLU(64, 128, 3, 1, 1, 1)),
+            ('conv1', _ConvBatchNormReLU(3, 64, 3, 2, 1, 1)),
+            ('conv2', _ConvBatchNormReLU(64, 64, 3, 1, 1, 1)),
+            ('conv3', _ConvBatchNormReLU(64, 128, 3, 1, 1, 1)),
             ('pool', nn.MaxPool2d(3, 2, 1))
         ]))
         self.layer2 = _ResBlock(n_blocks[0], 128, 64, 256, 1, 1)
@@ -96,15 +42,17 @@ class _DilatedFCN(nn.Module):
 
 
 class _PyramidPoolModule(nn.Sequential):
+    """Pyramid Pooling Module"""
 
-    def __init__(self, in_ch, pyramids=[6, 3, 2, 1]):
+    def __init__(self, in_channels, pyramids=[6, 3, 2, 1]):
         super(_PyramidPoolModule, self).__init__()
-        out_ch = in_ch // len(pyramids)
+        out_channels = in_channels // len(pyramids)
         self.stages = nn.ModuleList([
             nn.Sequential(OrderedDict([
                 ('pool', nn.AdaptiveAvgPool2d(output_size=p)),
-                ('conv', _ConvBNReLU(in_ch, out_ch, 1, 1, 0, 1)),
-            ])) for p in pyramids])
+                ('conv', _ConvBatchNormReLU(in_channels, out_channels, 1, 1, 0, 1)), ]))
+            for p in pyramids
+        ])
 
     def forward(self, x):
         hs = [x]
@@ -117,22 +65,24 @@ class _PyramidPoolModule(nn.Sequential):
 
 
 class PSPNet(nn.Module):
-    def __init__(self, n_class, n_blocks, pyramids):
+    """Pyramid Scene Parsing Network"""
+
+    def __init__(self, n_classes, n_blocks, pyramids):
         super(PSPNet, self).__init__()
-        self.n_class = n_class
+        self.n_classes = n_classes
         self.fcn = _DilatedFCN(n_blocks=n_blocks)
-        self.ppm = _PyramidPoolModule(in_ch=2048, pyramids=pyramids)
+        self.ppm = _PyramidPoolModule(in_channels=2048, pyramids=pyramids)
         # Main branch
         self.final = nn.Sequential(OrderedDict([
-            ('conv5_4', _ConvBNReLU(4096, 512, 3, 1, 1, 1)),
+            ('conv5_4', _ConvBatchNormReLU(4096, 512, 3, 1, 1, 1)),
             ('drop5_4', nn.Dropout2d(p=0.1)),
-            ('conv6', nn.Conv2d(512, n_class, 1, stride=1, padding=0))
+            ('conv6', nn.Conv2d(512, n_classes, 1, stride=1, padding=0))
         ]))
         # Auxiliary branch
         self.aux = nn.Sequential(OrderedDict([
-            ('conv4_aux', _ConvBNReLU(1024, 256, 3, 1, 1, 1)),
+            ('conv4_aux', _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
             ('drop4_aux', nn.Dropout2d(p=0.1)),
-            ('conv6_1', nn.Conv2d(256, n_class, 1, stride=1, padding=1)),
+            ('conv6_1', nn.Conv2d(256, n_classes, 1, stride=1, padding=1)),
         ]))
 
     def forward(self, x):
@@ -152,9 +102,8 @@ class PSPNet(nn.Module):
 
 
 if __name__ == '__main__':
-    model = PSPNet(n_class=150, n_blocks=[3, 4, 6, 3], pyramids=[6, 3, 2, 1])
+    model = PSPNet(n_classes=150, n_blocks=[3, 4, 6, 3], pyramids=[6, 3, 2, 1])
     print list(model.named_children())
-
     model.eval()
     image = torch.autograd.Variable(torch.randn(1, 3, 473, 473))
     print model(image).size()

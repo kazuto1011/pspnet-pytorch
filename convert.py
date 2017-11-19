@@ -140,7 +140,7 @@ def main(dataset):
 
     params = parse_caffemodel(CONFIG['path_caffe_model'])
 
-    model = PSPNet(n_class=CONFIG['n_classes'],
+    model = PSPNet(n_classes=CONFIG['n_classes'],
                    n_blocks=CONFIG['n_blocks'],
                    pyramids=CONFIG['pyramids'])
     model.eval()

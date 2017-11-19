@@ -95,7 +95,7 @@ def main(dataset, image_path, cuda, crf):
     state_dict = torch.load(CONFIG['path_pytorch_model'])
 
     # Model
-    model = PSPNet(n_class=CONFIG['n_classes'],
+    model = PSPNet(n_classes=CONFIG['n_classes'],
                    n_blocks=CONFIG['n_blocks'],
                    pyramids=CONFIG['pyramids'])
     model.load_state_dict(state_dict)
