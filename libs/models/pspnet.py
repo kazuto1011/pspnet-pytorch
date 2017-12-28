@@ -82,7 +82,7 @@ class PSPNet(nn.Module):
         self.aux = nn.Sequential(OrderedDict([
             ('conv4_aux', _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
             ('drop4_aux', nn.Dropout2d(p=0.1)),
-            ('conv6_1', nn.Conv2d(256, n_classes, 3, stride=1, padding=1)),
+            ('conv6_1', nn.Conv2d(256, n_classes, 1, stride=1, padding=0)),
         ]))
 
     def forward(self, x):
