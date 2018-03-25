@@ -12,9 +12,11 @@ from collections import OrderedDict
 
 import click
 import numpy as np
-
-import caffe_pb2
 import torch
+import yaml
+from addict import Dict
+
+from libs import caffe_pb2
 from libs.models import PSPNet
 
 
@@ -62,7 +64,6 @@ def parse_caffemodel(model_path):
 
 # Hard coded translater
 def translate_layer_name(source):
-
     def conv_or_bn(source):
         if 'bn' in source:
             return '.bn'
@@ -86,7 +87,7 @@ def translate_layer_name(source):
         # Pyramid pooling modules
         elif layer == 5 and block == 3 and 'pool' in source[2]:
             pyramid = {1: 3, 2: 2, 3: 1, 6: 0}[int(source[2][4])]
-            target += 'ppm.stages.{}.conv'.format(pyramid)
+            target += 'ppm.stages.s{}.conv'.format(pyramid)
             target += conv_or_bn(source)
         # Last convolutions
         elif layer == 5 and block == 4:
@@ -110,58 +111,50 @@ def translate_layer_name(source):
 
 
 @click.command()
-@click.option('--dataset', required=True, type=click.Choice(['ade20k', 'voc12', 'cityscapes']))
-def main(dataset):
-    WHITELIST = ['kernel_size', 'stride', 'padding', 'dilation', 'eps', 'momentum']  # NOQA
-    MODEL_ROOT = 'data/models/'
-    CONFIG = {
-        'ade20k': {
-            'path_caffe_model': MODEL_ROOT + 'pspnet50_ADE20K.caffemodel',
-            'path_pytorch_model': MODEL_ROOT + 'pspnet50_ADE20K.pth',
-            'n_classes': 150,
-            'n_blocks': [3, 4, 6, 3],
-            'pyramids': [6, 3, 2, 1]
-        },
-        'voc12': {
-            'path_caffe_model': MODEL_ROOT + 'pspnet101_VOC2012.caffemodel',
-            'path_pytorch_model': MODEL_ROOT + 'pspnet101_VOC2012.pth',
-            'n_classes': 21,
-            'n_blocks': [3, 4, 23, 3],
-            'pyramids': [6, 3, 2, 1]
-        },
-        'cityscapes': {
-            'path_caffe_model': MODEL_ROOT + 'pspnet101_cityscapes.caffemodel',
-            'path_pytorch_model': MODEL_ROOT + 'pspnet101_cityscapes.pth',
-            'n_classes': 19,
-            'n_blocks': [3, 4, 23, 3],
-            'pyramids': [6, 3, 2, 1]
-        }
-    }.get(dataset)
+@click.option('--config', '-c', required=True)
+def main(config):
+    WHITELIST = ['kernel_size', 'stride', 'padding', 'dilation', 'eps', 'momentum']
+    CONFIG = Dict(yaml.load(open(config)))
 
-    params = parse_caffemodel(CONFIG['path_caffe_model'])
+    params = parse_caffemodel(CONFIG.CAFFE_MODEL)
 
-    model = PSPNet(n_classes=CONFIG['n_classes'],
-                   n_blocks=CONFIG['n_blocks'],
-                   pyramids=CONFIG['pyramids'])
+    model = PSPNet(n_classes=CONFIG.N_CLASSES, n_blocks=CONFIG.N_BLOCKS, pyramids=CONFIG.PYRAMIDS)
     model.eval()
     own_state = model.state_dict()
 
+    report = []
     state_dict = OrderedDict()
     for layer_name, layer_dict in params.items():
         for param_name, values in layer_dict.items():
             if param_name in WHITELIST:
+                attribute = translate_layer_name(layer_name)
+                attribute = eval('model.' + attribute + '.' + param_name)
+                message = ' '.join([
+                    layer_name.ljust(25), '->', param_name, 'pytorch: ' + str(attribute), 'caffe: ' + str(values)
+                ])
+                print(message, end='')
+                if isinstance(attribute, tuple):
+                    if attribute[0] != values:
+                        report.append(message)
+                else:
+                    if abs(attribute - values) > 1e-4:
+                        report.append(message)
+                print(': Checked!')
                 continue
             param_name = translate_layer_name(layer_name) + '.' + param_name
             if param_name in own_state:
+                print(layer_name.ljust(25), '->', param_name, end='')
                 values = torch.FloatTensor(values)
                 values = values.view_as(own_state[param_name])
                 state_dict[param_name] = values
-                print(layer_name.ljust(25), '->', param_name, ': Copied')
+                print(': Copied!')
+
+    print('Inconsistent parameters (*_3x3 dilation and momentum can be ignored):')
+    print(*report, sep='\n')
 
     # Check
     model.load_state_dict(state_dict)
-
-    torch.save(state_dict, CONFIG['path_pytorch_model'])
+    torch.save(state_dict, CONFIG.PYTORCH_MODEL)
 
 
 if __name__ == '__main__':

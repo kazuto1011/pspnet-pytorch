@@ -1,0 +1,19 @@
+DATASET: 'cityscapes'
+DATASET_ROOT:
+CAFFE_MODEL: 'data/models/pspnet101_cityscapes.caffemodel'
+PYTORCH_MODEL: 'data/models/pspnet101_cityscapes.pth'
+LABELS: 'data/datasets/cityscapes/labels.txt'
+N_CLASSES: 19
+N_BLOCKS: [3, 4, 23, 3]
+PYRAMIDS: [6, 3, 2, 1]
+IMAGE:
+  SIZE:
+    BASE: 2048
+    TRAIN: 713
+    TEST: 713
+  MEAN:
+    R: 123.68
+    G: 116.779
+    B: 103.939
+SCALES: [0.5, 0.75, 1, 1.25, 1.5, 1.75]
+NUM_WORKERS: 1

@@ -5,7 +5,6 @@
 # URL:      http://kazuto1011.github.io
 # Created:  2017-11-06
 
-
 import torch
 from graphviz import Digraph
 from torch.autograd import Variable
@@ -17,12 +16,7 @@ def make_dot(var, params):
 
     param_map = {id(v): k for k, v in params.items()}
 
-    node_attr = dict(style='filled',
-                     shape='box',
-                     align='left',
-                     fontsize='12',
-                     ranksep='0.1',
-                     height='0.2')
+    node_attr = dict(style='filled', shape='box', align='left', fontsize='12', ranksep='0.1', height='0.2')
     dot = Digraph(node_attr=node_attr, graph_attr=dict(size="12,12"))
     seen = set()
 
@@ -32,15 +26,12 @@ def make_dot(var, params):
     def add_nodes(var):
         if var not in seen:
             if torch.is_tensor(var):
-                dot.node(str(id(var)), size_to_str(
-                    var.size()), fillcolor='orange')
+                dot.node(str(id(var)), size_to_str(var.size()), fillcolor='orange')
             elif hasattr(var, 'variable'):
                 u = var.variable
-                dot.node(str(id(var)), size_to_str(
-                    u.size()), fillcolor='lightblue')
+                dot.node(str(id(var)), size_to_str(u.size()), fillcolor='lightblue')
             else:
-                dot.node(str(id(var)), str(
-                    type(var).__name__.replace('Backward', '')))
+                dot.node(str(id(var)), str(type(var).__name__.replace('Backward', '')))
             seen.add(var)
             if hasattr(var, 'next_functions'):
                 for u in var.next_functions:
@@ -59,9 +50,7 @@ def make_dot(var, params):
 
 if __name__ == '__main__':
     # Define a model
-    model = PSPNet(n_classes=6,
-                   n_blocks=[3, 4, 6, 3],
-                   pyramids=[6, 3, 2, 1])
+    model = PSPNet(n_classes=6, n_blocks=[3, 4, 6, 3], pyramids=[6, 3, 2, 1])
 
     # Build a computational graph from x to y
     x = torch.randn(2, 3, 512, 512)

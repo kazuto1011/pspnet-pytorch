@@ -18,12 +18,14 @@ class _DilatedFCN(nn.Module):
 
     def __init__(self, n_blocks):
         super(_DilatedFCN, self).__init__()
-        self.layer1 = nn.Sequential(OrderedDict([
-            ('conv1', _ConvBatchNormReLU(3, 64, 3, 2, 1, 1)),
-            ('conv2', _ConvBatchNormReLU(64, 64, 3, 1, 1, 1)),
-            ('conv3', _ConvBatchNormReLU(64, 128, 3, 1, 1, 1)),
-            ('pool', nn.MaxPool2d(3, 2, 1))
-        ]))
+        self.layer1 = nn.Sequential(
+            OrderedDict([
+                ('conv1', _ConvBatchNormReLU(3, 64, 3, 2, 1, 1)),
+                ('conv2', _ConvBatchNormReLU(64, 64, 3, 1, 1, 1)),
+                ('conv3', _ConvBatchNormReLU(64, 128, 3, 1, 1, 1)),
+                ('pool', nn.MaxPool2d(3, 2, 1)),
+            ])
+        )
         self.layer2 = _ResBlock(n_blocks[0], 128, 64, 256, 1, 1)
         self.layer3 = _ResBlock(n_blocks[1], 256, 128, 512, 2, 1)
         self.layer4 = _ResBlock(n_blocks[2], 512, 256, 1024, 1, 2)
@@ -47,17 +49,22 @@ class _PyramidPoolModule(nn.Sequential):
     def __init__(self, in_channels, pyramids=[6, 3, 2, 1]):
         super(_PyramidPoolModule, self).__init__()
         out_channels = in_channels // len(pyramids)
-        self.stages = nn.ModuleList([
-            nn.Sequential(OrderedDict([
-                ('pool', nn.AdaptiveAvgPool2d(output_size=p)),
-                ('conv', _ConvBatchNormReLU(in_channels, out_channels, 1, 1, 0, 1)), ]))
-            for p in pyramids
-        ])
+        self.stages = nn.Module()
+        for i, p in enumerate(pyramids):
+            self.stages.add_module(
+                's{}'.format(i),
+                nn.Sequential(
+                    OrderedDict([
+                        ('pool', nn.AdaptiveAvgPool2d(output_size=p)),
+                        ('conv', _ConvBatchNormReLU(in_channels, out_channels, 1, 1, 0, 1)),
+                    ])
+                )
+            )
 
     def forward(self, x):
         hs = [x]
         height, width = x.size()[2:]
-        for stage in self.stages:
+        for stage in self.stages.children():
             h = stage(x)
             h = F.upsample(h, (height, width), mode='bilinear')
             hs.append(h)
@@ -73,17 +80,21 @@ class PSPNet(nn.Module):
         self.fcn = _DilatedFCN(n_blocks=n_blocks)
         self.ppm = _PyramidPoolModule(in_channels=2048, pyramids=pyramids)
         # Main branch
-        self.final = nn.Sequential(OrderedDict([
-            ('conv5_4', _ConvBatchNormReLU(4096, 512, 3, 1, 1, 1)),
-            ('drop5_4', nn.Dropout2d(p=0.1)),
-            ('conv6', nn.Conv2d(512, n_classes, 1, stride=1, padding=0))
-        ]))
+        self.final = nn.Sequential(
+            OrderedDict([
+                ('conv5_4', _ConvBatchNormReLU(4096, 512, 3, 1, 1, 1)),
+                ('drop5_4', nn.Dropout2d(p=0.1)),
+                ('conv6', nn.Conv2d(512, n_classes, 1, stride=1, padding=0)),
+            ])
+        )
         # Auxiliary branch
-        self.aux = nn.Sequential(OrderedDict([
-            ('conv4_aux', _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
-            ('drop4_aux', nn.Dropout2d(p=0.1)),
-            ('conv6_1', nn.Conv2d(256, n_classes, 1, stride=1, padding=0)),
-        ]))
+        self.aux = nn.Sequential(
+            OrderedDict([
+                ('conv4_aux', _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
+                ('drop4_aux', nn.Dropout2d(p=0.1)),
+                ('conv6_1', nn.Conv2d(256, n_classes, 1, stride=1, padding=0)),
+            ])
+        )
 
     def forward(self, x):
         if self.training:
@@ -91,7 +102,6 @@ class PSPNet(nn.Module):
             aux = self.aux(aux)
         else:
             h = self.fcn(x)
-
         h = self.ppm(h)
         h = self.final(h)
 

@@ -1,0 +1,19 @@
+DATASET: 'voc12'
+DATASET_ROOT: '/media/kazuto1011/Extra/VOCdevkit'
+CAFFE_MODEL: 'data/models/pspnet101_VOC2012.caffemodel'
+PYTORCH_MODEL: 'data/models/pspnet101_VOC2012.pth'
+LABELS: 'data/datasets/voc12/labels.txt'
+N_CLASSES: 21
+N_BLOCKS: [3, 4, 23, 3]
+PYRAMIDS: [6, 3, 2, 1]
+IMAGE:
+  SIZE:
+    BASE: 512
+    TRAIN: 473
+    TEST: 473
+  MEAN:
+    R: 123.68
+    G: 116.779
+    B: 103.939
+SCALES: [1,]
+NUM_WORKERS: 1
