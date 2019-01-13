@@ -5,12 +5,15 @@
 # URL:      http://kazuto1011.github.io
 # Created:  2017-11-15
 
+from __future__ import absolute_import
+
 from collections import OrderedDict
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from resnet import _ConvBatchNormReLU, _ResBlock
+
+from .resnet import _ConvBatchNormReLU, _ResBlock
 
 
 class _DilatedFCN(nn.Module):
@@ -19,12 +22,14 @@ class _DilatedFCN(nn.Module):
     def __init__(self, n_blocks):
         super(_DilatedFCN, self).__init__()
         self.layer1 = nn.Sequential(
-            OrderedDict([
-                ('conv1', _ConvBatchNormReLU(3, 64, 3, 2, 1, 1)),
-                ('conv2', _ConvBatchNormReLU(64, 64, 3, 1, 1, 1)),
-                ('conv3', _ConvBatchNormReLU(64, 128, 3, 1, 1, 1)),
-                ('pool', nn.MaxPool2d(3, 2, 1)),
-            ])
+            OrderedDict(
+                [
+                    ("conv1", _ConvBatchNormReLU(3, 64, 3, 2, 1, 1)),
+                    ("conv2", _ConvBatchNormReLU(64, 64, 3, 1, 1, 1)),
+                    ("conv3", _ConvBatchNormReLU(64, 128, 3, 1, 1, 1)),
+                    ("pool", nn.MaxPool2d(3, 2, 1)),
+                ]
+            )
         )
         self.layer2 = _ResBlock(n_blocks[0], 128, 64, 256, 1, 1)
         self.layer3 = _ResBlock(n_blocks[1], 256, 128, 512, 2, 1)
@@ -52,13 +57,20 @@ class _PyramidPoolModule(nn.Sequential):
         self.stages = nn.Module()
         for i, p in enumerate(pyramids):
             self.stages.add_module(
-                's{}'.format(i),
+                "s{}".format(i),
                 nn.Sequential(
-                    OrderedDict([
-                        ('pool', nn.AdaptiveAvgPool2d(output_size=p)),
-                        ('conv', _ConvBatchNormReLU(in_channels, out_channels, 1, 1, 0, 1)),
-                    ])
-                )
+                    OrderedDict(
+                        [
+                            ("pool", nn.AdaptiveAvgPool2d(output_size=p)),
+                            (
+                                "conv",
+                                _ConvBatchNormReLU(
+                                    in_channels, out_channels, 1, 1, 0, 1
+                                ),
+                            ),
+                        ]
+                    )
+                ),
             )
 
     def forward(self, x):
@@ -66,7 +78,7 @@ class _PyramidPoolModule(nn.Sequential):
         height, width = x.size()[2:]
         for stage in self.stages.children():
             h = stage(x)
-            h = F.upsample(h, (height, width), mode='bilinear')
+            h = F.upsample(h, (height, width), mode="bilinear")
             hs.append(h)
         return torch.cat(hs, dim=1)
 
@@ -81,19 +93,23 @@ class PSPNet(nn.Module):
         self.ppm = _PyramidPoolModule(in_channels=2048, pyramids=pyramids)
         # Main branch
         self.final = nn.Sequential(
-            OrderedDict([
-                ('conv5_4', _ConvBatchNormReLU(4096, 512, 3, 1, 1, 1)),
-                ('drop5_4', nn.Dropout2d(p=0.1)),
-                ('conv6', nn.Conv2d(512, n_classes, 1, stride=1, padding=0)),
-            ])
+            OrderedDict(
+                [
+                    ("conv5_4", _ConvBatchNormReLU(4096, 512, 3, 1, 1, 1)),
+                    ("drop5_4", nn.Dropout2d(p=0.1)),
+                    ("conv6", nn.Conv2d(512, n_classes, 1, stride=1, padding=0)),
+                ]
+            )
         )
         # Auxiliary branch
         self.aux = nn.Sequential(
-            OrderedDict([
-                ('conv4_aux', _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
-                ('drop4_aux', nn.Dropout2d(p=0.1)),
-                ('conv6_1', nn.Conv2d(256, n_classes, 1, stride=1, padding=0)),
-            ])
+            OrderedDict(
+                [
+                    ("conv4_aux", _ConvBatchNormReLU(1024, 256, 3, 1, 1, 1)),
+                    ("drop4_aux", nn.Dropout2d(p=0.1)),
+                    ("conv6_1", nn.Conv2d(256, n_classes, 1, stride=1, padding=0)),
+                ]
+            )
         )
 
     def forward(self, x):
@@ -111,9 +127,9 @@ class PSPNet(nn.Module):
             return h
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     model = PSPNet(n_classes=150, n_blocks=[3, 4, 6, 3], pyramids=[6, 3, 2, 1])
-    print list(model.named_children())
+    print(list(model.named_children()))
     model.eval()
     image = torch.autograd.Variable(torch.randn(1, 3, 473, 473))
-    print model(image).size()
+    print(model(image).size())

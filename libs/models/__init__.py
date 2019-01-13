@@ -1,2 +1,3 @@
-from libs.models.resnet import *
-from libs.models.pspnet import *
+from __future__ import absolute_import
+from .resnet import *
+from .pspnet import *
