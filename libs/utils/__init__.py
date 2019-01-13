@@ -1,2 +1,3 @@
-from libs.utils.crf import *
-from libs.utils.metric import *
+from __future__ import absolute_import
+from .crf import *
+from .metric import *

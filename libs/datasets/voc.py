@@ -4,34 +4,45 @@ import os
 import os.path as osp
 import sys
 
+import cv2
+import numpy as np
 import torch
 import torch.utils.data as data
 from PIL import Image
-import cv2
-import numpy as np
 
 
 class VOCSegmentation(data.Dataset):
-    def __init__(self, root, image_set, transform=None, target_transform=None, dataset_name='VOC2007'):
+    def __init__(
+        self,
+        root,
+        image_set,
+        transform=None,
+        target_transform=None,
+        dataset_name="VOC2007",
+    ):
         self.root = root
         self.image_set = image_set
         self.transform = transform
         self.target_transform = target_transform
         self.mean_rgb = np.array([123.68, 116.779, 103.939])
 
-        self._annopath = osp.join(self.root, dataset_name, 'SegmentationClass', '%s.png')
-        self._imgpath = osp.join(self.root, dataset_name, 'JPEGImages', '%s.jpg')
-        self._imgsetpath = osp.join(self.root, dataset_name, 'ImageSets', 'Segmentation', '%s.txt')
+        self._annopath = osp.join(
+            self.root, dataset_name, "SegmentationClass", "%s.png"
+        )
+        self._imgpath = osp.join(self.root, dataset_name, "JPEGImages", "%s.jpg")
+        self._imgsetpath = osp.join(
+            self.root, dataset_name, "ImageSets", "Segmentation", "%s.txt"
+        )
 
         with open(self._imgsetpath % self.image_set) as f:
             self.ids = f.readlines()
-        self.ids = [x.strip('\n') for x in self.ids]
+        self.ids = [x.strip("\n") for x in self.ids]
 
     def __getitem__(self, index):
         img_id = self.ids[index]
 
         target = Image.open(self._annopath % img_id)
-        img = Image.open(self._imgpath % img_id).convert('RGB')
+        img = Image.open(self._imgpath % img_id).convert("RGB")
 
         if self.transform is not None:
             img = self.transform(img)
